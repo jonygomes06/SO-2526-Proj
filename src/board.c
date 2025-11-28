@@ -1,11 +1,10 @@
 #include "board.h"
+#include "parser.h"
+#include "utils.h"
 #include <stdlib.h>
 #include <stdio.h>
-#include <time.h>
 #include <unistd.h>
-#include <stdarg.h>
 
-FILE * debugfile;
 
 // Helper private function to find and kill pacman at specific position
 static int find_and_kill_pacman(board_t* board, int new_x, int new_y) {
@@ -30,12 +29,6 @@ static inline int is_valid_position(board_t* board, int x, int y) {
     return (x >= 0 && x < board->width) && (y >= 0 && y < board->height); // Inside of the board boundaries
 }
 
-void sleep_ms(int milliseconds) {
-    struct timespec ts;
-    ts.tv_sec = milliseconds / 1000;
-    ts.tv_nsec = (milliseconds % 1000) * 1000000;
-    nanosleep(&ts, NULL);
-}
 
 int move_pacman(board_t* board, int pacman_index, command_t* command) {
     if (pacman_index < 0 || !board->pacmans[pacman_index].alive) {
@@ -376,34 +369,10 @@ int load_ghost(board_t* board) {
 }
 
 int load_level(board_t *board, int points) {
-    board->height = 5;
-    board->width = 10;
-    board->tempo = 10;
+    snprintf(board->level_file, MAX_FILENAME, "%s%d.lvl", board->assets_dir, board->current_level);
+    debug("Loading level file: %s\n", board->level_file);
 
-    board->n_ghosts = 2;
-    board->n_pacmans = 1;
-
-    board->board = calloc(board->width * board->height, sizeof(board_pos_t));
-    board->pacmans = calloc(board->n_pacmans, sizeof(pacman_t));
-    board->ghosts = calloc(board->n_ghosts, sizeof(ghost_t));
-
-    sprintf(board->level_name, "Static Level");
-
-    for (int i = 0; i < board->height; i++) {
-        for (int j = 0; j < board->width; j++) {
-            if (i == 0 || j == 0 || j == (board->width - 1)) {
-                board->board[i * board->width + j].content = 'W';
-            }
-            else if (i == 4 && j == 8) {
-                board->board[i * board->width + j].content = ' ';
-                board->board[i * board->width + j].has_portal = 1;
-            }
-            else {
-                board->board[i * board->width + j].content = ' ';
-                board->board[i * board->width + j].has_dot = 1;
-            }
-        }
-    }
+    parse_level_file(board);
 
     load_ghost(board);
     load_pacman(board, points);
@@ -415,67 +384,4 @@ void unload_level(board_t * board) {
     free(board->board);
     free(board->pacmans);
     free(board->ghosts);
-}
-
-void open_debug_file(char *filename) {
-    debugfile = fopen(filename, "w");
-}
-
-void close_debug_file() {
-    fclose(debugfile);
-}
-
-void debug(const char * format, ...) {
-    va_list args;
-    va_start(args, format);
-    vfprintf(debugfile, format, args);
-    va_end(args);
-
-    fflush(debugfile);
-}
-
-void print_board(board_t *board) {
-    if (!board || !board->board) {
-        debug("[%d] Board is empty or not initialized.\n", getpid());
-        return;
-    }
-
-    // Large buffer to accumulate the whole output
-    char buffer[8192];
-    size_t offset = 0;
-
-    offset += snprintf(buffer + offset, sizeof(buffer) - offset,
-                       "=== [%d] LEVEL INFO ===\n"
-                       "Dimensions: %d x %d\n"
-                       "Tempo: %d\n"
-                       "Pacman file: %s\n",
-                       getpid(), board->height, board->width, board->tempo, board->pacman_file);
-
-    offset += snprintf(buffer + offset, sizeof(buffer) - offset,
-                       "Monster files (%d):\n", board->n_ghosts);
-
-    for (int i = 0; i < board->n_ghosts; i++) {
-        offset += snprintf(buffer + offset, sizeof(buffer) - offset,
-                           "  - %s\n", board->ghosts_files[i]);
-    }
-
-    offset += snprintf(buffer + offset, sizeof(buffer) - offset, "\n=== BOARD ===\n");
-
-    for (int y = 0; y < board->height; y++) {
-        for (int x = 0; x < board->width; x++) {
-            int idx = y * board->width + x;
-            if (offset < sizeof(buffer) - 2) {
-                buffer[offset++] = board->board[idx].content;
-            }
-        }
-        if (offset < sizeof(buffer) - 2) {
-            buffer[offset++] = '\n';
-        }
-    }
-
-    offset += snprintf(buffer + offset, sizeof(buffer) - offset, "==================\n");
-
-    buffer[offset] = '\0';
-
-    debug("%s", buffer);
 }

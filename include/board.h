@@ -3,7 +3,8 @@
 
 #define MAX_MOVES 20
 #define MAX_LEVELS 20
-#define MAX_FILENAME 256
+#define MAX_DIRNAME 256
+#define MAX_FILENAME 320
 #define MAX_GHOSTS 25
 
 typedef enum {
@@ -47,20 +48,21 @@ typedef struct {
 } board_pos_t;
 
 typedef struct {
+    char assets_dir[MAX_DIRNAME]; // directory where assets are located
     int width, height;      // dimensions of the board
     board_pos_t* board;     // actual board, a row-major matrix
     int n_pacmans;          // number of pacmans in the board
     pacman_t* pacmans;      // array containing every pacman in the board to iterate through when processing (Just 1)
     int n_ghosts;           // number of ghosts in the board
     ghost_t* ghosts;        // array containing every ghost in the board to iterate through when processing
-    char level_name[256];   //name for the level file to keep track of which will be the next
-    char pacman_file[256];  // file with pacman movements
-    char ghosts_files[MAX_GHOSTS][256]; // files with monster movements
+    int n_levels;           // number of levels available
+    int current_level;      // index of the current level being played
+    char level_file[MAX_FILENAME];   // file with the level layout
+    char pacman_file[MAX_FILENAME];  // file with pacman movements
+    char ghosts_files[MAX_GHOSTS][MAX_FILENAME]; // files with monster movements
     int tempo;              // Duration of each play
 } board_t;
 
-/*Makes the current thread sleep for 'int milliseconds' miliseconds*/
-void sleep_ms(int milliseconds);
 
 /*Processes a command for Pacman or Ghost(Monster)
 *_index - corresponding index in board's pacman_t/ghost_t array
@@ -82,19 +84,5 @@ int load_level(board_t* board, int accumulated_points);
 
 /*Unloads levels loaded by load_level*/
 void unload_level(board_t * board);
-
-// DEBUG FILE
-
-/*Opens the debug file*/
-void open_debug_file(char *filename);
-
-/*Closes the debug file*/
-void close_debug_file();
-
-/*Writes to the open debug file*/
-void debug(const char * format, ...);
-
-/*Writes the board and its contents to the open debug file*/
-void print_board(board_t* board);
 
 #endif

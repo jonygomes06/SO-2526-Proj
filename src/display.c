@@ -61,7 +61,7 @@ void draw_board(board_t* board, int mode) {
         break;
 
     case DRAW_MENU:
-        mvprintw(1, 0, "Level: %s | Use W/A/S/D to move | Q to quit | G to quicksave ", board->level_name);
+        mvprintw(1, 0, "Level: %s | Use W/A/S/D to move | Q to quit | G to quicksave ", board->level_file);
         break;
     }
 

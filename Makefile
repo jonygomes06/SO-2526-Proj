@@ -1,54 +1,65 @@
-# Compiler variables
-CC = gcc
-CFLAGS = -g -Wall -Wextra -Werror -std=c17 -D_POSIX_C_SOURCE=200809L
-LDFLAGS = -lncurses
+# ==========================================
+#   Pacmanist Project Makefile
+# ==========================================
 
-# Directory variables
-SRC_DIR = src
-OBJ_DIR = obj
-BIN_DIR = bin
-INCLUDE_DIR = include
+# --- Variables ---
+CC        := gcc
+CFLAGS    := -g -Wall -Wextra -Werror -std=c17 -D_POSIX_C_SOURCE=200809L
+# Automatic dependency generation flags
+DEPFLAGS  := -MMD -MP
+LDFLAGS   := -lncurses
+INCLUDES  := -Iinclude
 
-# executable 
-TARGET = Pacmanist
+# --- Directories ---
+SRC_DIR   := src
+OBJ_DIR   := obj
+BIN_DIR   := bin
 
-# Objects variables
-OBJS = game.o display.o board.o
+# --- Targets ---
+TARGET_NAME := Pacmanist
+TARGET      := $(BIN_DIR)/$(TARGET_NAME)
 
-# Dependencies
-display.o = display.h
-board.o = board.h
+# --- Files ---
+# Find all .c files in src directory automatically
+SRCS      := $(wildcard $(SRC_DIR)/*.c)
+# Create a list of .o files based on .c files, but in the obj dir
+OBJS      := $(patsubst $(SRC_DIR)/%.c, $(OBJ_DIR)/%.o, $(SRCS))
+# Define dependency files (.d) corresponding to objects
+DEPS      := $(OBJS:.o=.d)
 
-# Object files path
-vpath %.o $(OBJ_DIR)
-vpath %.c $(SRC_DIR)
+# ==========================================
+#   Rules
+# ==========================================
 
-# Make targets
-all: pacmanist
+.PHONY: all clean run
 
-pacmanist: $(BIN_DIR)/$(TARGET)
+all: $(TARGET)
 
-$(BIN_DIR)/$(TARGET): $(OBJS) | folders
-	$(CC) $(CFLAGS) $(SLEEP) $(addprefix $(OBJ_DIR)/,$(OBJS)) -o $@ $(LDFLAGS)
+# Link the executable
+# LDFLAGS is usually best placed at the end for Linux linkers
+$(TARGET): $(OBJS) | $(BIN_DIR)
+	@echo "Linking $(TARGET_NAME)..."
+	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LDFLAGS)
 
-# dont include LDFLAGS in the end, to allow compilation on macos
-%.o: %.c $($@) | folders
-	$(CC) -I $(INCLUDE_DIR) $(CFLAGS) -o $(OBJ_DIR)/$@ -c $<
+# Compile source files into object files
+# The | $(OBJ_DIR) ensures the folder exists before compiling
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
+	@echo "Compiling $<..."
+	$(CC) $(CFLAGS) $(INCLUDES) $(DEPFLAGS) -c $< -o $@
 
-# run the program
-run: pacmanist
-	@./$(BIN_DIR)/$(TARGET)
+# Create directories if they don't exist
+$(BIN_DIR) $(OBJ_DIR):
+	mkdir -p $@
 
-# Create folders
-folders:
-	mkdir -p $(OBJ_DIR)
-	mkdir -p $(BIN_DIR)
+# Run the game
+run: all
+	@echo "Running $(TARGET_NAME)..."
+	@./$(TARGET) $(ARGS)
 
-# Clean object files and executable
+# Clean up build artifacts
 clean:
-	rm -f $(OBJ_DIR)/*.o
-	rm -f $(BIN_DIR)/$(TARGET)
-	rm -f *.log
+	@echo "Cleaning..."
+	@rm -rf $(OBJ_DIR) $(BIN_DIR) *.log
 
-# indentify targets that do not create files
-.PHONY: all clean run folders
+# Include automatically generated dependencies
+-include $(DEPS)
