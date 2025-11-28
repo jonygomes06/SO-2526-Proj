@@ -91,7 +91,7 @@ int main(int argc, char** argv) {
 
     parse_levels_directory(&game_board);
 
-    while (!end_game) {
+    while (!end_game && game_board.current_level <= game_board.n_levels) {
         load_level(&game_board, accumulated_points);
         draw_board(&game_board, DRAW_MENU);
         refresh_screen();
@@ -100,6 +100,7 @@ int main(int argc, char** argv) {
             int result = play_board(&game_board); 
 
             if(result == NEXT_LEVEL) {
+                game_board.current_level += 1;
                 screen_refresh(&game_board, DRAW_WIN);
                 sleep_ms(game_board.tempo);
                 break;
