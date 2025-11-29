@@ -176,9 +176,9 @@ int parse_level_file(board_t* board) {
 }
 
 
-int parse_entity_file(board_t* board) {
+int parse_pacman_file(board_t* board) {
     const char* filepath = board->level_file;
-    ghost_t* ghost = &board->ghosts[0]; // For simplicity, parse first ghost only
+    pacman_t* pacman = &board->pacmans[0];
 
     int fd = open(filepath, O_RDONLY);
     if (fd < 0) {
@@ -186,20 +186,11 @@ int parse_entity_file(board_t* board) {
         return -1;
     }
 
-    // Initialize defaults
-    ghost->pos_x = 0;
-    ghost->pos_y = 0;
-    ghost->passo = 0;
-    ghost->n_moves = 0;
-    ghost->current_move = 0;
-    ghost->waiting = 0;
-    ghost->charged = 0;
 
     char line_buffer[1024];
     char line_work[1024];
 
     while (read_line(fd, line_buffer, 1024) > 0) {
-        // Skip empty lines and comments
         if (strlen(line_buffer) == 0) continue;
         if (line_buffer[0] == '#') continue;
 
@@ -210,20 +201,20 @@ int parse_entity_file(board_t* board) {
         // --- DIRECTIVES ---
         if (strcmp(token, "PASSO") == 0) {
             char* val = strtok(NULL, " \t\r\n");
-            if (val) ghost->passo = atoi(val);
+            if (val) pacman->passo = atoi(val);
         }
         else if (strcmp(token, "POS") == 0) {
             char* row = strtok(NULL, " \t\r\n");
             char* col = strtok(NULL, " \t\r\n");
             if (row && col) {
-                ghost->pos_y = atoi(row); // Line is Y
-                ghost->pos_x = atoi(col); // Column is X
+                pacman->pos_y = atoi(row); // Line is Y
+                pacman->pos_x = atoi(col); // Column is X
             }
         }
         // --- COMMANDS ---
         else {
-            if (ghost->n_moves < MAX_MOVES) {
-                command_t* cmd = &ghost->moves[ghost->n_moves];
+            if (pacman->n_moves < MAX_MOVES) {
+                command_t* cmd = &pacman->moves[pacman->n_moves];
                 
                 cmd->command = token[0]; // 'A', 'W', 'S', etc.
                 cmd->turns = 0;
@@ -237,7 +228,7 @@ int parse_entity_file(board_t* board) {
                         cmd->turns_left = cmd->turns;
                     }
                 }
-                ghost->n_moves++;
+                pacman->n_moves++;
             }
         }
     }

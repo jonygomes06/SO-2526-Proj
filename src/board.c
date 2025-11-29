@@ -327,11 +327,18 @@ void kill_pacman(board_t* board, int pacman_index) {
 
 // Static Loading
 int load_pacman(board_t* board, int points) {
-    board->board[1 * board->width + 1].content = 'P'; // Pacman
-    board->pacmans[0].pos_x = 1;
-    board->pacmans[0].pos_y = 1;
-    board->pacmans[0].alive = 1;
-    board->pacmans[0].points = points;
+    pacman_t* pacman = &board->pacmans[0];
+
+    // Initialize defaults
+    pacman->pos_x = 0;
+    pacman->pos_y = 0;
+    pacman->alive = 1;
+    pacman->points = points;
+    pacman->passo = 0;
+    pacman->n_moves = 0;
+    pacman->current_move = 0;
+    pacman->waiting = 0;
+    
     return 0;
 }
 
@@ -374,8 +381,8 @@ int load_level(board_t *board, int points) {
 
     parse_level_file(board);
 
-    load_ghost(board);
     load_pacman(board, points);
+    load_ghost(board);
 
     return 0;
 }
