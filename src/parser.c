@@ -177,15 +177,16 @@ int parse_level_file(board_t* board) {
 
 
 int parse_pacman_file(board_t* board) {
-    const char* filepath = board->level_file;
-    pacman_t* pacman = &board->pacmans[0];
+    const char* filepath = board->pacman_file;
+    debug("Parsing pacman file: %s\n", filepath);
 
     int fd = open(filepath, O_RDONLY);
     if (fd < 0) {
-        perror("Error: Could not open ghost file");
+        perror("Error: Could not open pacman file");
         return -1;
     }
 
+    pacman_t* pacman = &board->pacmans[0];
 
     char line_buffer[1024];
     char line_work[1024];
@@ -229,6 +230,69 @@ int parse_pacman_file(board_t* board) {
                     }
                 }
                 pacman->n_moves++;
+            }
+        }
+    }
+
+    close(fd);
+    return 0;
+}
+
+
+int parse_ghost_file(board_t* board, int ghost_idx) {
+    const char* filepath = board->ghosts_files[ghost_idx];
+    debug("Parsing ghost file: %s\n", filepath);
+
+    int fd = open(filepath, O_RDONLY);
+    if (fd < 0) {
+        perror("Error: Could not open ghost file");
+        return -1;
+    }
+
+    ghost_t* ghost = &board->ghosts[ghost_idx];
+
+    char line_buffer[1024];
+    char line_work[1024];
+
+    while (read_line(fd, line_buffer, 1024) > 0) {
+        if (strlen(line_buffer) == 0) continue;
+        if (line_buffer[0] == '#') continue;
+
+        strcpy(line_work, line_buffer);
+        char* token = strtok(line_work, " \t\r\n");
+        if (token == NULL) continue;
+
+        // --- DIRECTIVES ---
+        if (strcmp(token, "PASSO") == 0) {
+            char* val = strtok(NULL, " \t\r\n");
+            if (val) ghost->passo = atoi(val);
+        }
+        else if (strcmp(token, "POS") == 0) {
+            char* row = strtok(NULL, " \t\r\n");
+            char* col = strtok(NULL, " \t\r\n");
+            if (row && col) {
+                ghost->pos_y = atoi(row); // Line is Y
+                ghost->pos_x = atoi(col); // Column is X
+            }
+        }
+        // --- COMMANDS ---
+        else {
+            if (ghost->n_moves < MAX_MOVES) {
+                command_t* cmd = &ghost->moves[ghost->n_moves];
+                
+                cmd->command = token[0]; // 'A', 'W', 'S', etc.
+                cmd->turns = 0;
+                cmd->turns_left = 0;
+
+                // Handle 'T' (Wait) argument
+                if (cmd->command == 'T') {
+                    char* arg = strtok(NULL, " \t\r\n");
+                    if (arg) {
+                        cmd->turns = atoi(arg);
+                        cmd->turns_left = cmd->turns;
+                    }
+                }
+                ghost->n_moves++;
             }
         }
     }

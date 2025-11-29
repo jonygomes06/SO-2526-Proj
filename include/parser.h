@@ -9,4 +9,8 @@ int parse_levels_directory(board_t* board);
 
 int parse_level_file(board_t* board);
 
+int parse_pacman_file(board_t* board);
+
+int parse_ghost_file(board_t* board, int ghost_idx);
+
 #endif

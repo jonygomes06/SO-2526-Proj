@@ -338,39 +338,32 @@ int load_pacman(board_t* board, int points) {
     pacman->n_moves = 0;
     pacman->current_move = 0;
     pacman->waiting = 0;
+
+    parse_pacman_file(board);
+
+    board->board[pacman->pos_y * board->width + pacman->pos_x].content = 'P';
     
     return 0;
 }
 
 // Static Loading
-int load_ghost(board_t* board) {
-    // Ghost 0
-    board->board[3 * board->width + 1].content = 'M'; // Monster
-    board->ghosts[0].pos_x = 1;
-    board->ghosts[0].pos_y = 3;
-    board->ghosts[0].passo = 0;
-    board->ghosts[0].waiting = 0;
-    board->ghosts[0].current_move = 0;
-    board->ghosts[0].n_moves = 16;
-    for (int i = 0; i < 8; i++) {
-        board->ghosts[0].moves[i].command = 'D';
-        board->ghosts[0].moves[i].turns = 1; 
-    }
-    for (int i = 8; i < 16; i++) {
-        board->ghosts[0].moves[i].command = 'A';
-        board->ghosts[0].moves[i].turns = 1; 
-    }
+int load_ghosts(board_t* board) {
 
-    // Ghost 1
-    board->board[2 * board->width + 4].content = 'M'; // Monster
-    board->ghosts[1].pos_x = 4;
-    board->ghosts[1].pos_y = 2;
-    board->ghosts[1].passo = 1;
-    board->ghosts[1].waiting = 1;
-    board->ghosts[1].current_move = 0;
-    board->ghosts[1].n_moves = 1;
-    board->ghosts[1].moves[0].command = 'R'; // Random
-    board->ghosts[1].moves[0].turns = 1; 
+    for (int i = 0; i < board->n_ghosts; i++) {
+        ghost_t* ghost = &board->ghosts[i];
+        // Initialize defaults
+        ghost->pos_x = 0;
+        ghost->pos_y = 0;
+        ghost->passo = 0;
+        ghost->n_moves = 0;
+        ghost->current_move = 0;
+        ghost->waiting = 0;
+        ghost->charged = 0;
+
+        parse_ghost_file(board, i);
+
+        board->board[ghost->pos_y * board->width + ghost->pos_x].content = 'M';
+    }
     
     return 0;
 }
@@ -382,7 +375,7 @@ int load_level(board_t *board, int points) {
     parse_level_file(board);
 
     load_pacman(board, points);
-    load_ghost(board);
+    load_ghosts(board);
 
     return 0;
 }
