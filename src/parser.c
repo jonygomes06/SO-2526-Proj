@@ -76,8 +76,8 @@ int parse_level_file(board_t* board) {
     board->width = 0;
     board->height = 0;
     board->n_ghosts = 0;
-    board->n_pacmans = 0;                    // Will be set to 1 if PAC file is found
-    board->pacmans = NULL;
+    board->n_pacmans = 1;
+    board->pacmans = calloc(board->n_pacmans, sizeof(pacman_t));
     board->ghosts = NULL;
     board->board = NULL;
     board->pacman_file[0] = '\0';            // Default Pacman file to empty in case it's manual
@@ -113,9 +113,6 @@ int parse_level_file(board_t* board) {
             char *p_file = strtok(NULL, " \t\r");
             if (p_file) {
                 snprintf(board->pacman_file, MAX_FILENAME, "%s%s", board->assets_dir, p_file);
-                
-                board->n_pacmans = 1; 
-                board->pacmans = calloc(board->n_pacmans, sizeof(pacman_t));
             }
         }
         else if (strcmp(token, "MON") == 0) {
@@ -133,8 +130,6 @@ int parse_level_file(board_t* board) {
         }
         else {
             // --- Map Data Processing ---
-            // If it's not a keyword, it's part of the grid layout.
-            // We use the original line_buffer to preserve all chars (except newline).
             if (board->board != NULL) {
                 int len = strlen(line_buffer);
                 for (int i = 0; i < len; i++) {
@@ -152,7 +147,7 @@ int parse_level_file(board_t* board) {
                         pos->content = ' '; 
 
                         if (c == 'X') {
-                            pos->content = 'W'; // W for Wall
+                            pos->content = 'W';
                         } 
                         else if (c == '@') {
                             pos->has_portal = 1;
@@ -177,5 +172,76 @@ int parse_level_file(board_t* board) {
         return -1;
     }
 
+    return 0;
+}
+
+
+int parse_entity_file(board_t* board) {
+    const char* filepath = board->level_file;
+    ghost_t* ghost = &board->ghosts[0]; // For simplicity, parse first ghost only
+
+    int fd = open(filepath, O_RDONLY);
+    if (fd < 0) {
+        perror("Error: Could not open ghost file");
+        return -1;
+    }
+
+    // Initialize defaults
+    ghost->pos_x = 0;
+    ghost->pos_y = 0;
+    ghost->passo = 0;
+    ghost->n_moves = 0;
+    ghost->current_move = 0;
+    ghost->waiting = 0;
+    ghost->charged = 0;
+
+    char line_buffer[1024];
+    char line_work[1024];
+
+    while (read_line(fd, line_buffer, 1024) > 0) {
+        // Skip empty lines and comments
+        if (strlen(line_buffer) == 0) continue;
+        if (line_buffer[0] == '#') continue;
+
+        strcpy(line_work, line_buffer);
+        char* token = strtok(line_work, " \t\r\n");
+        if (token == NULL) continue;
+
+        // --- DIRECTIVES ---
+        if (strcmp(token, "PASSO") == 0) {
+            char* val = strtok(NULL, " \t\r\n");
+            if (val) ghost->passo = atoi(val);
+        }
+        else if (strcmp(token, "POS") == 0) {
+            char* row = strtok(NULL, " \t\r\n");
+            char* col = strtok(NULL, " \t\r\n");
+            if (row && col) {
+                ghost->pos_y = atoi(row); // Line is Y
+                ghost->pos_x = atoi(col); // Column is X
+            }
+        }
+        // --- COMMANDS ---
+        else {
+            if (ghost->n_moves < MAX_MOVES) {
+                command_t* cmd = &ghost->moves[ghost->n_moves];
+                
+                cmd->command = token[0]; // 'A', 'W', 'S', etc.
+                cmd->turns = 0;
+                cmd->turns_left = 0;
+
+                // Handle 'T' (Wait) argument
+                if (cmd->command == 'T') {
+                    char* arg = strtok(NULL, " \t\r\n");
+                    if (arg) {
+                        cmd->turns = atoi(arg);
+                        cmd->turns_left = cmd->turns;
+                    }
+                }
+                ghost->n_moves++;
+            }
+        }
+    }
+
+    close(fd);
     return 0;
 }

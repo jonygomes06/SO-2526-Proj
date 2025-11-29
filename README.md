@@ -134,3 +134,57 @@ gdb -p <Pacmaist_PID>
 ```
 
 Note que o Pacmanist continuará a correr até ao momento de fazer attach, logo, se quiser fazer debug no inicio da aplicação, pode adicionar um delay no inicio do programa, para dar tempo de fazer attach. 
+
+# GDB – Debug com dois terminais e redirecionamento TTY
+
+A biblioteca `ncurses` captura o terminal onde o programa corre, por isso é necessário usar **dois terminais** para fazer debug no GDB. O processo recomendado é o seguinte:
+
+## Debug usando dois terminais + `tty`
+
+1. **Terminal 1 – abrir o gdb**
+   ```bash
+   sudo gdb ./bin/Pacmanist
+   ```
+
+2. **Definir os argumentos do programa dentro do gdb**
+   ```gdb
+   (gdb) set args ./tests/levels_example_1/
+   ```
+
+3. **Terminal 2 – descobrir o dispositivo do terminal**
+   ```bash
+   $ tty
+   /dev/pts/X
+   ```
+   (substitua `X` pelo número que aparecer)
+
+4. **Voltar ao Terminal 1 e redirecionar o I/O do programa**
+   ```gdb
+   (gdb) tty /dev/pts/X
+   ```
+
+   Agora o ncurses irá correr no **Terminal 2**, enquanto o GDB permanece no Terminal 1.
+
+5. **Opcional: definir um breakpoint**
+   ```gdb
+   (gdb) break main
+   ```
+
+6. **Executar o programa**
+   ```gdb
+   (gdb) run
+   ```
+
+A partir deste momento:
+- O GDB continua totalmente funcional no **Terminal 1**;
+- O jogo aparece e aceita input no **Terminal 2**.
+
+Isto permite inspeccionar variáveis, fazer stepping, breakpoints e analisar comportamento, sem que o ncurses destrua o terminal do GDB.
+
+---
+
+## Alternativa: Attach ao processo já em execução
+
+```bash
+gdb -p <Pacmanist_PID>
+```

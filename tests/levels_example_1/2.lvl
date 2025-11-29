@@ -1,15 +1,23 @@
-DIM 12 12
+DIM 25 20
 TEMPO 10
 MON 1.m 3.m
-XXoXXXXXoXXX
-XoooXXXXXooo
-XoXoXXXXoXoX
-Xooo@XXXXooX
-XooooXXXXXoo
-XXXXXXooooXX
-XXXXXX@ooooo
-XooooXXXXXoX
-XoooXXXXXooo
-XXoXXXoXXXXX
-XXoXXXoXXXXX
-XXoXXXoXXXXX
+XXXXXXXXXXXXXXXXXXXXXXXXX
+XoooooXooooXooooXoooooooX
+XoXXXoXoXXoXoXXoXoXXXoooX
+XoXooooXooXoXooXoXooXoooX
+XoXooXoXXXoXXXoXoXooXoooX
+XoXooXooooXooooXoXooXoooX
+XoXXXoooXXoXXXXoXXXoXoooX
+XoooooXoooooXoooooXoooooX
+XXXXXoXoXXXXXoXXXXXoXXXoX
+XoooooXoooooXoooooXoooooX
+XoXXXoooXXXXXoooXXXoXXXoo
+XoXoooXoooooooXoooXoXoooo
+XoXoXXXoXXX@XXXoXXXoXoXoX
+XoXoXooooooooooXooXoXoXoX
+XoXoXooXXXXoXXXXooXoXoXoX
+XoXoXoooooXoXoooooXoXoXoX
+XoXoXXXXXXoXoXXXXXXoXoXoX
+XoXoooooooooooooooooXoXoX
+XoXXXXXoXXXXoXXXXXoXXoXoX
+XoooooXoooooXoooooXoooooX

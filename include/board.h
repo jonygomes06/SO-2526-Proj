@@ -21,21 +21,21 @@ typedef struct {
 } command_t;
 
 typedef struct {
-    int pos_x, pos_y; //current position
-    int alive; // if is alive
-    int points; // how many points have been collected
-    int passo; // number of plays to wait before starting
+    int pos_x, pos_y;            // current position
+    int alive;                   // if is alive
+    int points;                  // how many points have been collected
+    int passo;                   // number of plays to wait before starting
     command_t moves[MAX_MOVES];
+    int n_moves;                 // number of predefined moves, 0 if controlled by user, >0 if readed from level file
     int current_move;
-    int n_moves; // number of predefined moves, 0 if controlled by user, >0 if readed from level file
     int waiting;
 } pacman_t;
 
 typedef struct {
-    int pos_x, pos_y; //current position
-    int passo; // number of plays to wait between each move
+    int pos_x, pos_y;            // current position
+    int passo;                   // number of plays to wait between each move
     command_t moves[MAX_MOVES];
-    int n_moves; // number of predefined moves from level file
+    int n_moves;                 // number of predefined moves from level file
     int current_move;
     int waiting;
     int charged;
@@ -48,19 +48,19 @@ typedef struct {
 } board_pos_t;
 
 typedef struct {
-    char assets_dir[MAX_DIRNAME]; // directory where assets are located
-    int width, height;      // dimensions of the board
-    board_pos_t* board;     // actual board, a row-major matrix
-    int n_pacmans;          // number of pacmans in the board
-    pacman_t* pacmans;      // array containing every pacman in the board to iterate through when processing (Just 1)
-    int n_ghosts;           // number of ghosts in the board
-    ghost_t* ghosts;        // array containing every ghost in the board to iterate through when processing
-    int n_levels;           // number of levels available
-    int current_level;      // index of the current level being played
+    char assets_dir[MAX_DIRNAME];    // directory where assets are located
+    int width, height;               // dimensions of the board
+    board_pos_t* board;              // actual board, a row-major matrix
+    int n_pacmans;                   // number of pacmans in the board
+    pacman_t* pacmans;               // array containing every pacman in the board to iterate through when processing (Just 1)
+    int n_ghosts;                    // number of ghosts in the board
+    ghost_t* ghosts;                 // array containing every ghost in the board to iterate through when processing
+    int n_levels;                    // number of levels available
+    int current_level;               // index of the current level being played
     char level_file[MAX_FILENAME];   // file with the level layout
     char pacman_file[MAX_FILENAME];  // file with pacman movements
     char ghosts_files[MAX_GHOSTS][MAX_FILENAME]; // files with monster movements
-    int tempo;              // Duration of each play
+    int tempo;                       // Duration of each play
 } board_t;
 
 
