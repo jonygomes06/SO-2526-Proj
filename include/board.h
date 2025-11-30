@@ -61,6 +61,8 @@ typedef struct {
     char pacman_file[MAX_FILENAME];  // file with pacman movements
     char ghosts_files[MAX_GHOSTS][MAX_FILENAME]; // files with monster movements
     int tempo;                       // Duration of each play
+    int has_saved;                   // flag to indicate if game state has already been saved
+    int is_backup_instance;          // flag to indicate if this instance is a backup
 } board_t;
 
 

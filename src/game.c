@@ -6,6 +6,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <string.h>
+#include <sys/wait.h>
 
 #define CONTINUE_PLAY 0
 #define NEXT_LEVEL 1
@@ -42,6 +43,10 @@ int play_board(board_t * game_board) {
 
     debug("KEY %c\n", play->command);
 
+    if (play->command == 'G') {
+        return CREATE_BACKUP;
+    }
+
     if (play->command == 'Q') {
         return QUIT_GAME;
     }
@@ -70,6 +75,35 @@ int play_board(board_t * game_board) {
     return CONTINUE_PLAY;  
 }
 
+int create_backup(board_t* board) {
+    if (board->has_saved) {
+        debug("State has been already saved.\n");
+        return 0;
+    }
+
+    debug("Creating backup process.\n");
+
+    int pid = fork();
+    if (pid < 0) {
+        debug("Failed to create backup process.\n");
+        return -1;
+    }
+
+    board->has_saved = 1;
+    
+    if (pid != 0) {
+        // Parent process
+        board->is_backup_instance = 0;
+        wait(NULL);
+        debug("Pacman restored from backup.\n");
+    } else {
+        // Child process - Backup instance
+        board->is_backup_instance = 1;
+    }
+
+    return 0;
+}
+
 int main(int argc, char** argv) {
     if (argc != 2) {
         printf("Usage: %s <level_directory>\n", argv[0]);
@@ -88,6 +122,8 @@ int main(int argc, char** argv) {
     bool end_game = false;
 
     strncpy(game_board.assets_dir, argv[1], MAX_DIRNAME);
+    game_board.has_saved = 0;
+    game_board.is_backup_instance = 0;
 
     parse_levels_directory(&game_board);
 
@@ -112,6 +148,10 @@ int main(int argc, char** argv) {
                 end_game = true;
                 break;
             }
+
+            if(result == CREATE_BACKUP) {
+                create_backup(&game_board);
+            }
     
             screen_refresh(&game_board, DRAW_MENU); 
 
@@ -119,7 +159,12 @@ int main(int argc, char** argv) {
         }
         print_board(&game_board);
         unload_level(&game_board);
-    }    
+    }
+
+    if (game_board.is_backup_instance) {
+        debug("Backup instance exiting.\n");
+        exit(0);
+    }
 
     terminal_cleanup();
 

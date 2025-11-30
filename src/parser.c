@@ -96,11 +96,11 @@ int parse_level_file(board_t* board) {
         if (token == NULL) continue;
 
         if (strcmp(token, "DIM") == 0) {
-            char* w_str = strtok(NULL, " \t\r");
             char* h_str = strtok(NULL, " \t\r");
+            char* w_str = strtok(NULL, " \t\r");
             if (w_str && h_str) {
-                board->width = atoi(w_str);
                 board->height = atoi(h_str);
+                board->width = atoi(w_str);
                 
                 board->board = calloc(board->width * board->height, sizeof(board_pos_t));
             }

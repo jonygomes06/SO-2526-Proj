@@ -1,10 +1,10 @@
 PASSO 1
 POS 5 4
 A
-A
-D
+W
+W
 T 2
 W
-S
-S
+C
+D
 S
