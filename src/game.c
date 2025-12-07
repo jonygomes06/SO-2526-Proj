@@ -4,105 +4,9 @@
 #include "display.h"
 #include <stdlib.h>
 #include <time.h>
-#include <unistd.h>
 #include <string.h>
-#include <sys/wait.h>
+#include <pthread.h>
 
-#define CONTINUE_PLAY 0
-#define NEXT_LEVEL 1
-#define QUIT_GAME 2
-#define LOAD_BACKUP 3
-#define CREATE_BACKUP 4
-
-void screen_refresh(board_t * game_board, int mode) {
-    debug("REFRESH\n");
-    draw_board(game_board, mode);
-    refresh_screen();
-    if(game_board->tempo != 0)
-        sleep_ms(game_board->tempo);       
-}
-
-int play_board(board_t * game_board) {
-    pacman_t* pacman = &game_board->pacmans[0];
-    command_t* play;
-    if (pacman->n_moves == 0) { // if is user input
-        command_t c; 
-        c.command = get_input();
-
-        if(c.command == '\0')
-            return CONTINUE_PLAY;
-
-        c.turns = 1;
-        play = &c;
-    }
-    else { // else if the moves are pre-defined in the file
-        // avoid buffer overflow wrapping around with modulo of n_moves
-        // this ensures that we always access a valid move for the pacman
-        play = &pacman->moves[pacman->current_move%pacman->n_moves];
-    }
-
-    debug("KEY %c\n", play->command);
-
-    if (play->command == 'G') {
-        return CREATE_BACKUP;
-    }
-
-    if (play->command == 'Q') {
-        return QUIT_GAME;
-    }
-
-    int result = move_pacman(game_board, 0, play);
-    if (result == REACHED_PORTAL) {
-        // Next level
-        return NEXT_LEVEL;
-    }
-
-    if(result == DEAD_PACMAN) {
-        return QUIT_GAME;
-    }
-    
-    for (int i = 0; i < game_board->n_ghosts; i++) {
-        ghost_t* ghost = &game_board->ghosts[i];
-        // avoid buffer overflow wrapping around with modulo of n_moves
-        // this ensures that we always access a valid move for the ghost
-        move_ghost(game_board, i, &ghost->moves[ghost->current_move%ghost->n_moves]);
-    }
-
-    if (!game_board->pacmans[0].alive) {
-        return QUIT_GAME;
-    }      
-
-    return CONTINUE_PLAY;  
-}
-
-int create_backup(board_t* board) {
-    if (board->has_saved) {
-        debug("State has been already saved.\n");
-        return 0;
-    }
-
-    debug("Creating backup process.\n");
-
-    int pid = fork();
-    if (pid < 0) {
-        debug("Failed to create backup process.\n");
-        return -1;
-    }
-
-    board->has_saved = 1;
-    
-    if (pid != 0) {
-        // Parent process
-        board->is_backup_instance = 0;
-        wait(NULL);
-        debug("Pacman restored from backup.\n");
-    } else {
-        // Child process - Backup instance
-        board->is_backup_instance = 1;
-    }
-
-    return 0;
-}
 
 int main(int argc, char** argv) {
     if (argc != 2) {
@@ -129,34 +33,20 @@ int main(int argc, char** argv) {
 
     while (!end_game && game_board.current_level <= game_board.n_levels) {
         load_level(&game_board, accumulated_points);
-        draw_board(&game_board, DRAW_MENU);
-        refresh_screen();
+        screen_refresh(&game_board, DRAW_MENU);
 
-        while(true) {
-            int result = play_board(&game_board); 
+        pthread_t ui_level_tid;
 
-            if(result == NEXT_LEVEL) {
-                game_board.current_level += 1;
-                screen_refresh(&game_board, DRAW_WIN);
-                sleep_ms(game_board.tempo);
-                break;
-            }
-
-            if(result == QUIT_GAME) {
-                screen_refresh(&game_board, DRAW_GAME_OVER); 
-                sleep_ms(game_board.tempo);
-                end_game = true;
-                break;
-            }
-
-            if(result == CREATE_BACKUP) {
-                create_backup(&game_board);
-            }
-    
-            screen_refresh(&game_board, DRAW_MENU); 
-
-            accumulated_points = game_board.pacmans[0].points;      
+        if (pthread_create(&ui_level_tid, NULL, ui_level_thread, (void*)&game_board) != 0) {
+            debug("Error creating UI thread.\n");
+            break;
         }
+
+        pthread_join(ui_level_tid, NULL);
+        
+        accumulated_points = game_board.pacmans[0].points;
+        end_game = (game_board.level_result == QUIT_GAME);
+
         print_board(&game_board);
         unload_level(&game_board);
     }

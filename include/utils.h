@@ -10,6 +10,10 @@ int read_line(int fd, char *buffer, int max_len);
 /*Makes the current thread sleep for 'int milliseconds' miliseconds*/
 void sleep_ms(int milliseconds);
 
+/*Creates a backup process for the current game state.
+  Returns 0 on success, -1 on failure.*/
+int create_backup(board_t* board);
+
 // DEBUG FILE
 
 /*Opens the debug file*/

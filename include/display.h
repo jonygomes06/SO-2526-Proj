@@ -35,6 +35,9 @@ void draw(char c, int colour_i, int pos_x, int pos_y);
 /*Call ncurses refresh() to update the screen*/
 void refresh_screen();
 
+/*Refreshes the screen with the current board state in the specified mode*/
+void screen_refresh(board_t * game_board, int mode);
+
 /*Ncurses will be reading the player's inputs*/
 char get_input();
 

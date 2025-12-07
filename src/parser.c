@@ -80,7 +80,7 @@ int parse_level_file(board_t* board) {
     board->pacmans = calloc(board->n_pacmans, sizeof(pacman_t));
     board->ghosts = NULL;
     board->board = NULL;
-    board->pacman_file[0] = '\0';            // Default Pacman file to empty in case it's manual
+    board->pacman_file[0] = '\0';
 
     char line_buffer[LINE_BUFFER_SIZE];
     int map_cell_index = 0; 

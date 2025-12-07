@@ -1,5 +1,6 @@
 #include "display.h"
 #include "board.h"
+#include "utils.h"
 #include <stdlib.h>
 #include <ctype.h>
 
@@ -18,7 +19,7 @@ int terminal_init() {
     keypad(stdscr, TRUE);
 
     // Make getch() non-blocking (return ERR if no input)
-    // nodelay(stdscr, TRUE); // Uncomment if non-blocking input is desired
+    nodelay(stdscr, TRUE); // Uncomment if non-blocking input is desired
 
     // Hide the cursor
     curs_set(0);
@@ -147,6 +148,13 @@ void draw(char c, int colour_i, int pos_x, int pos_y) {
 void refresh_screen() {
     // Update the physical screen with the virtual screen
     refresh();
+}
+
+
+void screen_refresh(board_t * game_board, int mode) {
+    debug("REFRESH\n");
+    draw_board(game_board, mode);
+    refresh_screen();      
 }
 
 char get_input() {

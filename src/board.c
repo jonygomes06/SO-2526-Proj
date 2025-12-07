@@ -1,32 +1,139 @@
 #include "board.h"
 #include "parser.h"
 #include "utils.h"
+#include "display.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <pthread.h>
+#include <semaphore.h>
 
 
-// Helper private function to find and kill pacman at specific position
-static int find_and_kill_pacman(board_t* board, int new_x, int new_y) {
-    for (int p = 0; p < board->n_pacmans; p++) {
-        pacman_t* pac = &board->pacmans[p];
-        if (pac->pos_x == new_x && pac->pos_y == new_y && pac->alive) {
-            pac->alive = 0;
-            kill_pacman(board, p);
-            return DEAD_PACMAN;
+sem_t sem_finished_plays;
+sem_t sem_ui_thread;
+
+
+int play_board(board_t* game_board) {
+    pacman_t* pacman = &game_board->pacmans[0];
+    command_t* play;
+    if (pacman->n_moves == 0) { // if is user input
+        command_t c; 
+        c.command = get_input();
+
+        if(c.command == '\0')
+            return CONTINUE_PLAY;
+
+        c.turns = 1;
+        play = &c;
+    }
+    else {
+        play = &pacman->moves[pacman->current_move%pacman->n_moves];
+    }
+
+    debug("KEY %c\n", play->command);
+
+    if (play->command == 'G') {
+        return CREATE_BACKUP;
+    }
+
+    if (play->command == 'Q') {
+        return QUIT_GAME;
+    }
+
+    int result = move_pacman(game_board, 0, play);
+    if (result == REACHED_PORTAL) {
+        // Next level
+        return NEXT_LEVEL;
+    }
+
+    if(result == DEAD_PACMAN) {
+        return QUIT_GAME;
+    }
+    
+    for (int i = 0; i < game_board->n_ghosts; i++) {
+        ghost_t* ghost = &game_board->ghosts[i];
+        move_ghost(game_board, i, &ghost->moves[ghost->current_move%ghost->n_moves]);
+    }
+
+    if (!game_board->pacmans[0].alive) {
+        return QUIT_GAME;
+    }      
+
+    return CONTINUE_PLAY;  
+}
+
+void* ui_level_thread(void* arg) {
+    board_t* board = (board_t*)arg;
+
+    pthread_t pacman_tid;
+    pthread_t ghosts_tid[board->n_ghosts];
+
+    sem_init(&sem_finished_plays, 0, 0);
+    sem_init(&sem_ui_thread, 0, 0);
+
+    pacman_thread_arg_t pacman_args;
+    ghost_thread_arg_t ghost_args[board->n_ghosts];
+
+    pacman_args.board = board;
+
+    if (pthread_create(&pacman_tid, NULL, pacman_thread, (void*)&pacman_args) != 0) {
+        debug("Error creating pacman thread.\n");
+        return NULL;
+    }
+
+    for (int i = 0; i < board->n_ghosts; i++) {
+        ghost_args[i].board = board;
+        ghost_args[i].ghost_id = i;
+        if (pthread_create(&ghosts_tid[i], NULL, ghost_thread, (void*)&ghost_args[i]) != 0) {
+            debug("Error creating ghost thread for ghost %d.\n", i);
+            return NULL;
         }
     }
-    return VALID_MOVE;
+
+    int n_entities = board->n_pacmans + board->n_ghosts; // pacmans + ghosts
+
+    screen_refresh(board, DRAW_MENU);
+
+    while (true) {
+        sleep_ms(board->tempo);
+
+        for (int i = 0; i < n_entities; i++) {
+            sem_wait(&sem_finished_plays);
+        }
+
+        if (board)
+
+        screen_refresh(board, DRAW_MENU);
+    }
+    
+
+
+    sem_destroy(&sem_finished_plays);
+    sem_destroy(&sem_ui_thread);
+
+    return NULL;
 }
 
-// Helper private function for getting board position index
-static inline int get_board_index(board_t* board, int x, int y) {
-    return y * board->width + x;
+void* pacman_thread(void* arg) {
+    board_t* board = (board_t*)arg;
+
+    while (true) {
+        sleep_ms(board->tempo);
+    }
+
+    return NULL;
 }
 
-// Helper private function for checking valid position
-static inline int is_valid_position(board_t* board, int x, int y) {
-    return (x >= 0 && x < board->width) && (y >= 0 && y < board->height); // Inside of the board boundaries
+void* ghost_thread(void* arg) {
+    ghost_thread_arg_t* args = (ghost_thread_arg_t*)arg;
+    board_t* board = args->board;
+    int ghost_id = args->ghost_id;
+
+    while (true) {
+        sleep_ms(board->tempo);
+    }
+
+    return NULL;
 }
 
 
@@ -384,4 +491,28 @@ void unload_level(board_t * board) {
     free(board->board);
     free(board->pacmans);
     free(board->ghosts);
+}
+
+
+// Helper private function to find and kill pacman at specific position
+static int find_and_kill_pacman(board_t* board, int new_x, int new_y) {
+    for (int p = 0; p < board->n_pacmans; p++) {
+        pacman_t* pac = &board->pacmans[p];
+        if (pac->pos_x == new_x && pac->pos_y == new_y && pac->alive) {
+            pac->alive = 0;
+            kill_pacman(board, p);
+            return DEAD_PACMAN;
+        }
+    }
+    return VALID_MOVE;
+}
+
+// Helper private function for getting board position index
+static inline int get_board_index(board_t* board, int x, int y) {
+    return y * board->width + x;
+}
+
+// Helper private function for checking valid position
+static inline int is_valid_position(board_t* board, int x, int y) {
+    return (x >= 0 && x < board->width) && (y >= 0 && y < board->height); // Inside of the board boundaries
 }

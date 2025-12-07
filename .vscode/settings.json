@@ -3,6 +3,7 @@
         "parser.h": "c",
         "dirent.h": "c",
         "display.h": "c",
-        "string.h": "c"
+        "string.h": "c",
+        "unistd.h": "c"
     }
 }
