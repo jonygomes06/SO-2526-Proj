@@ -37,6 +37,7 @@ typedef struct {
     int n_moves;                 // number of predefined moves, 0 if controlled by user, >0 if readed from level file
     int current_move;
     int waiting;
+    char ui_key;                 // last key pressed in UI thread
 } pacman_t;
 
 typedef struct {

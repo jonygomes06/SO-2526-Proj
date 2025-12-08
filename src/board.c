@@ -53,15 +53,22 @@ void* ui_level_thread(void* arg) {
         }
     }
 
-    int n_entities = board->n_pacmans + board->n_ghosts; // pacmans + ghosts
+    // int n_entities = board->n_pacmans + board->n_ghosts; // pacmans + ghosts
+    int n_entities = board->n_pacmans; // pacmans for now TODO remove this line when ghosts are implemented
 
     screen_refresh(board, DRAW_MENU);
 
     while (board->level_result == CONTINUE_PLAY) {
         sleep_ms(board->tempo);
 
+        if (board->has_saved) {
+            debug("UI thread: Hi there I am %d, waiting HERE 1.\n", board->is_backup_instance);
+        }
         for (int i = 0; i < n_entities; i++) {
             sem_wait(&sem_finished_plays);
+        }
+        if (board->has_saved) {
+            debug("UI thread: Hi there I am %d, waiting HERE 2.\n", board->is_backup_instance);
         }
 
         // Safe multithreaded enviorenment, other threads are waiting, no need to use locks
@@ -69,6 +76,7 @@ void* ui_level_thread(void* arg) {
         if (board->play_result == CREATE_BACKUP) {
             debug("UI thread: Creating backup...\n");
             create_backup(board);
+            board->play_result = CONTINUE;
         } else if (board->play_result == REACHED_PORTAL) {
             debug("UI thread: Level completed, moving to next level\n");
             board->level_result = NEXT_LEVEL;
@@ -79,6 +87,12 @@ void* ui_level_thread(void* arg) {
             debug("UI thread: User forced quit, quitting game\n");
             board->level_result = QUIT_GAME_FORCED;
         }
+
+        if (board->has_saved) {
+            debug("UI thread: Hi there I am %d.\n", board->is_backup_instance);
+        }
+
+        board->pacmans[0].ui_key = get_input();
 
         screen_refresh(board, DRAW_MENU);
 
@@ -114,6 +128,9 @@ void* pacman_thread(void* arg) {
     command_t* play;
 
     while (level_state == CONTINUE_PLAY) {
+        if (board->has_saved) {
+            debug("Pacman thread: Hi there I am %d, and got key %c\n", board->is_backup_instance, pacman->ui_key);
+        }
         if (pacman->waiting > 0) {
             pacman->waiting -= 1;
             finish_play(board, &level_state);
@@ -124,19 +141,25 @@ void* pacman_thread(void* arg) {
 
         if (pacman->n_moves == 0) { // if is user input
             command_t c; 
-            c.command = get_input();
+            c.command = pacman->ui_key;
 
             if(c.command == '\0') {
-                sem_post(&sem_finished_plays);
-                sem_wait(&sem_ui_thread);
-                level_state = board->level_result;
+                finish_play(board, &level_state);
                 continue;
             } else if (c.command == 'G' || c.command == 'Q') { 
                 pthread_rwlock_wrlock(&board->play_res_rwlock);
-                board->play_result = c.command == 'G' && board->play_result == CONTINUE ? CREATE_BACKUP : QUIT_PRESSED; // Force quit pressed
+                if (c.command == 'G' && board->play_result == CONTINUE) {
+                    board->play_result = CREATE_BACKUP;
+                } else if (c.command == 'Q') {
+                    board->play_result = QUIT_PRESSED;
+                }
                 pthread_rwlock_unlock(&board->play_res_rwlock);
 
+                debug("Pacman thread before: Hi there I am %d, and got key %c\n", board->is_backup_instance, pacman->ui_key);
                 finish_play(board, &level_state);
+                
+                debug("Pacman thread: Hi there I am %d, and got key %c\n", board->is_backup_instance, pacman->ui_key);
+
                 continue;
             }
 
@@ -268,16 +291,23 @@ void* pacman_thread(void* arg) {
         finish_play(board, &level_state);
     }
 
+    
+    if (board->has_saved) {
+        debug("Pacman thread: Hi there I am %d (2), and got key %c\n", board->is_backup_instance, pacman->ui_key);
+    }
+
     return NULL;
 }
 
 void* ghost_thread(void* arg) {
     ghost_thread_arg_t* args = (ghost_thread_arg_t*)arg;
     board_t* board = args->board;
-    int ghost_id = args->ghost_id;
 
-    while (ghost_id) {
+    int i = 0;
+
+    while (i < 5) { // TODO remove this when ghosts are implemented
         sleep_ms(board->tempo);
+        i++;
     }
 
     return NULL;

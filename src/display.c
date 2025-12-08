@@ -152,7 +152,7 @@ void refresh_screen() {
 
 
 void screen_refresh(board_t * game_board, int mode) {
-    debug("REFRESH\n");
+    // debug("REFRESH\n");
     draw_board(game_board, mode);
     refresh_screen();      
 }

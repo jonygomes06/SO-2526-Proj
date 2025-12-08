@@ -49,6 +49,10 @@ int main(int argc, char** argv) {
             screen_refresh(&game_board, DRAW_WIN);
             sleep_ms(2000);
             game_board.current_level++;
+
+            // Reset flags for next level
+            game_board.play_result = CONTINUE;
+            game_board.level_result = CONTINUE_PLAY;
         } else if (game_board.level_result == QUIT_GAME) {
             screen_refresh(&game_board, DRAW_GAME_OVER);
             sleep_ms(2000);
