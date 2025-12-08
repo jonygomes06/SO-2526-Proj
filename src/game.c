@@ -42,18 +42,31 @@ int main(int argc, char** argv) {
             break;
         }
 
+        debug("Started new thread for level %d\n", game_board.current_level);
         pthread_join(ui_level_tid, NULL);
+
+        if (game_board.level_result == NEXT_LEVEL) {
+            screen_refresh(&game_board, DRAW_WIN);
+            sleep_ms(2000);
+            game_board.current_level++;
+        } else if (game_board.level_result == QUIT_GAME) {
+            screen_refresh(&game_board, DRAW_GAME_OVER);
+            sleep_ms(2000);
+            end_game = true;
+        } else if (game_board.level_result == QUIT_GAME_FORCED) {
+            debug("Main thread: User forced quit, exiting game.\n");
+            end_game = true;
+        }
         
         accumulated_points = game_board.pacmans[0].points;
-        end_game = (game_board.level_result == QUIT_GAME);
 
         print_board(&game_board);
         unload_level(&game_board);
     }
 
     if (game_board.is_backup_instance) {
-        debug("Backup instance exiting.\n");
-        exit(0);
+        debug("Backup instance exiting with result %d.\n", game_board.level_result);
+        exit(game_board.level_result);
     }
 
     terminal_cleanup();

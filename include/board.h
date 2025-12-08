@@ -1,6 +1,8 @@
 #ifndef BOARD_H
 #define BOARD_H
 
+#include <pthread.h>
+
 #define MAX_MOVES 20
 #define MAX_LEVELS 20
 #define MAX_DIRNAME 256
@@ -8,15 +10,16 @@
 #define MAX_GHOSTS 25
 
 #define CONTINUE_PLAY 0
-#define NEXT_LEVEL 1
-#define QUIT_GAME 2
+#define NEXT_LEVEL 1        // Return this in backup instance to, indicates user reached last level for parent process
+#define QUIT_GAME 2         // Return this in backup instance to, indicates game should continue because pacman died
+#define QUIT_GAME_FORCED 3  // Return this in backup instance to, indicates game should quit because user pressed 'Q'
 
 typedef enum {
     CREATE_BACKUP = 2,
     REACHED_PORTAL = 1,
-    VALID_MOVE = 0,
-    INVALID_MOVE = -1,
-    DEAD_PACMAN = -2,
+    CONTINUE = 0,
+    DEAD_PACMAN = -1,
+    QUIT_PRESSED = -2,
 } move_t;
 
 typedef struct {
@@ -26,8 +29,8 @@ typedef struct {
 } command_t;
 
 typedef struct {
-    int pos_x, pos_y;            // current position
-    int alive;                   // if is alive
+    int pos_x, pos_y;            // current position (lock needed)
+    int alive;                   // if is alive      (lock needed)
     int points;                  // how many points have been collected
     int passo;                   // number of plays to wait before starting
     command_t moves[MAX_MOVES];
@@ -47,9 +50,10 @@ typedef struct {
 } ghost_t;
 
 typedef struct {
-    char content;   // stuff like 'P' for pacman 'M' for monster/ghost and 'W' for wall
-    int has_dot;    // whether there is a dot in this position or not
-    int has_portal; // whether there is a portal in this position or not
+    char content;                // stuff like 'P' for pacman 'M' for monster/ghost and 'W' for wall
+    int has_dot;                 // whether there is a dot in this position or not
+    int has_portal;              // whether there is a portal in this position or not
+    pthread_rwlock_t rwlock;     // rwlock for thread safety
 } board_pos_t;
 
 typedef struct {
@@ -69,11 +73,13 @@ typedef struct {
     int has_saved;                   // flag to indicate if game state has already been saved
     int is_backup_instance;          // flag to indicate if this instance is a backup
     int play_result;                 // result of the last play
+    pthread_rwlock_t play_res_rwlock;   // rwlock for play_result safe access
     int level_result;                // result of the last level played
 } board_t;
 
 typedef struct {
     board_t* board;
+    int pacman_id;
 } pacman_thread_arg_t;
 
 typedef struct {
@@ -81,8 +87,6 @@ typedef struct {
     int ghost_id;
 } ghost_thread_arg_t;
 
-
-int play_board(board_t* game_board);
 
 /*UI Level Thread*/
 void* ui_level_thread(void* arg);
@@ -97,7 +101,6 @@ void* ghost_thread(void* arg);
 /*Processes a command for Pacman or Ghost(Monster)
 *_index - corresponding index in board's pacman_t/ghost_t array
 command - command to be processed*/
-int move_pacman(board_t* board, int pacman_index, command_t* command);
 int move_ghost(board_t* board, int ghost_index, command_t* command);
 
 /*Process the death of a Pacman*/
@@ -114,11 +117,5 @@ int load_level(board_t* board, int accumulated_points);
 
 /*Unloads levels loaded by load_level*/
 void unload_level(board_t * board);
-
-static int find_and_kill_pacman(board_t* board, int new_x, int new_y);
-
-static inline int get_board_index(board_t* board, int x, int y);
-
-static inline int is_valid_position(board_t* board, int x, int y);
 
 #endif
