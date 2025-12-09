@@ -99,6 +99,12 @@ void* ui_level_thread(void* arg) {
         // Unlock threads to play next turn, unsafe enviorenment
 
         for (int i = 0; i < n_entities; i++) {
+            if (board->has_saved) {
+                debug("UI thread: Hi there I am %d, releasing semaphore %i\n", board->is_backup_instance, i);
+                int sval;
+                sem_getvalue(&sem_ui_thread, &sval);
+                debug("Semaphore value: %d\n", sval);
+            }
             sem_post(&sem_ui_thread);
         }
     }
