@@ -68,7 +68,7 @@ void play_level(board_t* board) {
 
         if (board->play_result == CREATE_BACKUP) {
             debug("UI thread: Creating backup...\n");
-            create_backup(board);
+            create_backup(board, &pacman_tid, &pacman_args);
             board->play_result = CONTINUE;
         } else if (board->play_result == REACHED_PORTAL) {
             debug("UI thread: Level completed, moving to next level\n");

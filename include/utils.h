@@ -12,7 +12,7 @@ void sleep_ms(int milliseconds);
 
 /*Creates a backup process for the current game state.
   Returns 0 on success, -1 on failure.*/
-int create_backup(board_t* board);
+int create_backup(board_t* board, pthread_t* pacman_tid, pacman_thread_arg_t* pacman_args);
 
 // DEBUG FILE
 

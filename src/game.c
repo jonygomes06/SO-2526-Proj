@@ -32,6 +32,8 @@ int main(int argc, char** argv) {
     parse_levels_directory(&game_board);
 
     while (!end_game && game_board.current_level <= game_board.n_levels) {
+        game_board.play_result = CONTINUE;
+        game_board.level_result = CONTINUE_PLAY;
         load_level(&game_board, accumulated_points);
         screen_refresh(&game_board, DRAW_MENU);
 
@@ -41,10 +43,6 @@ int main(int argc, char** argv) {
             screen_refresh(&game_board, DRAW_WIN);
             sleep_ms(2000);
             game_board.current_level++;
-
-            // Reset flags for next level
-            game_board.play_result = CONTINUE;
-            game_board.level_result = CONTINUE_PLAY;
         } else if (game_board.level_result == QUIT_GAME) {
             screen_refresh(&game_board, DRAW_GAME_OVER);
             sleep_ms(2000);
@@ -62,6 +60,11 @@ int main(int argc, char** argv) {
 
     if (game_board.is_backup_instance) {
         debug("Backup instance exiting with result %d.\n", game_board.level_result);
+        if (game_board.level_result == QUIT_GAME) {
+            game_board.level_result = CONTINUE_PLAY;
+        } else if (game_board.level_result == CONTINUE_PLAY) {
+            game_board.level_result = NEXT_LEVEL;
+        }
         exit(game_board.level_result);
     }
 
