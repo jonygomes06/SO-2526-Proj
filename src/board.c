@@ -22,9 +22,8 @@ sem_t sem_finished_plays;
 sem_t sem_ui_thread;
 
 
-void* ui_level_thread(void* arg) {
-    debug("UI level thread started.\n");
-    board_t* board = (board_t*)arg;
+void play_level(board_t* board) {
+    debug("Starting level\n");
     board->level_result = CONTINUE_PLAY;
 
     pthread_t pacman_tid;
@@ -41,7 +40,7 @@ void* ui_level_thread(void* arg) {
 
     if (pthread_create(&pacman_tid, NULL, pacman_thread, (void*)&pacman_args) != 0) {
         debug("Error creating pacman thread.\n");
-        return NULL;
+        return;
     }
 
     for (int i = 0; i < board->n_ghosts; i++) {
@@ -49,7 +48,7 @@ void* ui_level_thread(void* arg) {
         ghost_args[i].ghost_id = i;
         if (pthread_create(&ghosts_tid[i], NULL, ghost_thread, (void*)&ghost_args[i]) != 0) {
             debug("Error creating ghost thread for ghost %d.\n", i);
-            return NULL;
+            return;
         }
     }
 
@@ -61,14 +60,8 @@ void* ui_level_thread(void* arg) {
     while (board->level_result == CONTINUE_PLAY) {
         sleep_ms(board->tempo);
 
-        if (board->has_saved) {
-            debug("UI thread: Hi there I am %d, waiting HERE 1.\n", board->is_backup_instance);
-        }
         for (int i = 0; i < n_entities; i++) {
             sem_wait(&sem_finished_plays);
-        }
-        if (board->has_saved) {
-            debug("UI thread: Hi there I am %d, waiting HERE 2.\n", board->is_backup_instance);
         }
 
         // Safe multithreaded enviorenment, other threads are waiting, no need to use locks
@@ -88,10 +81,6 @@ void* ui_level_thread(void* arg) {
             board->level_result = QUIT_GAME_FORCED;
         }
 
-        if (board->has_saved) {
-            debug("UI thread: Hi there I am %d.\n", board->is_backup_instance);
-        }
-
         board->pacmans[0].ui_key = get_input();
 
         screen_refresh(board, DRAW_MENU);
@@ -99,17 +88,10 @@ void* ui_level_thread(void* arg) {
         // Unlock threads to play next turn, unsafe enviorenment
 
         for (int i = 0; i < n_entities; i++) {
-            if (board->has_saved) {
-                debug("UI thread: Hi there I am %d, releasing semaphore %i\n", board->is_backup_instance, i);
-                int sval;
-                sem_getvalue(&sem_ui_thread, &sval);
-                debug("Semaphore value: %d\n", sval);
-            }
             sem_post(&sem_ui_thread);
         }
     }
     
-
     pthread_join(pacman_tid, NULL);
     for (int i = 0; i < board->n_ghosts; i++) {
         pthread_join(ghosts_tid[i], NULL);
@@ -121,7 +103,7 @@ void* ui_level_thread(void* arg) {
     sem_destroy(&sem_finished_plays);
     sem_destroy(&sem_ui_thread);
 
-    return NULL;
+    return;
 }
 
 void* pacman_thread(void* arg) {
@@ -134,9 +116,6 @@ void* pacman_thread(void* arg) {
     command_t* play;
 
     while (level_state == CONTINUE_PLAY) {
-        if (board->has_saved) {
-            debug("Pacman thread: Hi there I am %d, and got key %c\n", board->is_backup_instance, pacman->ui_key);
-        }
         if (pacman->waiting > 0) {
             pacman->waiting -= 1;
             finish_play(board, &level_state);
@@ -161,11 +140,7 @@ void* pacman_thread(void* arg) {
                 }
                 pthread_rwlock_unlock(&board->play_res_rwlock);
 
-                debug("Pacman thread before: Hi there I am %d, and got key %c\n", board->is_backup_instance, pacman->ui_key);
                 finish_play(board, &level_state);
-                
-                debug("Pacman thread: Hi there I am %d, and got key %c\n", board->is_backup_instance, pacman->ui_key);
-
                 continue;
             }
 
@@ -295,11 +270,6 @@ void* pacman_thread(void* arg) {
         pthread_rwlock_unlock(&board->board[old_index].rwlock);
         pthread_rwlock_unlock(&board->board[new_index].rwlock);
         finish_play(board, &level_state);
-    }
-
-    
-    if (board->has_saved) {
-        debug("Pacman thread: Hi there I am %d (2), and got key %c\n", board->is_backup_instance, pacman->ui_key);
     }
 
     return NULL;

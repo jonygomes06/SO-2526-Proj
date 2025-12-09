@@ -53,14 +53,13 @@ int create_backup(board_t* board) {
     }
 
     board->has_saved = 1;
-    debug("Backup process created with PID %d.\n", pid);
     
     if (pid != 0) {
         // Parent process
-        debug("Pacman waiting in parent process.\n");
+        debug("Parent process waiting.\n");
         board->is_backup_instance = 0;
         wait(&board->level_result); // Wait for child to finish and get its exit status
-        debug("Pacman restored from backup.\n");
+        debug("Parent process restored from backup.\n");
     } else {
         // Child process - Backup instance
         debug("Backup instance running.\n");

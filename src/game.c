@@ -35,15 +35,7 @@ int main(int argc, char** argv) {
         load_level(&game_board, accumulated_points);
         screen_refresh(&game_board, DRAW_MENU);
 
-        pthread_t ui_level_tid;
-
-        if (pthread_create(&ui_level_tid, NULL, ui_level_thread, (void*)&game_board) != 0) {
-            debug("Error creating UI thread.\n");
-            break;
-        }
-
-        debug("Started new thread for level %d\n", game_board.current_level);
-        pthread_join(ui_level_tid, NULL);
+        play_level(&game_board);
 
         if (game_board.level_result == NEXT_LEVEL) {
             screen_refresh(&game_board, DRAW_WIN);

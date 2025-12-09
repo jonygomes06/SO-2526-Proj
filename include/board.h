@@ -90,7 +90,7 @@ typedef struct {
 
 
 /*UI Level Thread*/
-void* ui_level_thread(void* arg);
+void play_level(board_t* board);
 
 /*Pacman Thread*/
 void* pacman_thread(void* arg);
