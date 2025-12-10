@@ -139,6 +139,7 @@ void* pacman_thread(void* arg) {
 
     int level_state = board->level_result;
     command_t* play;
+    command_t c; 
 
     while (level_state == CONTINUE_PLAY) {
         sem_wait(&sem_start_turn);
@@ -153,7 +154,6 @@ void* pacman_thread(void* arg) {
         pacman->waiting = pacman->passo;
 
         if (pacman->n_moves == 0) { // if is user input
-            command_t c; 
             c.command = pacman->ui_key;
 
             if(c.command == '\0') {
