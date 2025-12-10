@@ -120,4 +120,8 @@ int load_level(board_t* board, int accumulated_points);
 /*Unloads levels loaded by load_level*/
 void unload_level(board_t * board);
 
+/*Creates a backup process for the current game state.
+  Returns 0 on success, -1 on failure.*/
+int create_backup(board_t* board, pthread_t* pacman_tid, pthread_t* ghosts_tid, pacman_thread_arg_t* pacman_args, ghost_thread_arg_t* ghost_args);
+
 #endif

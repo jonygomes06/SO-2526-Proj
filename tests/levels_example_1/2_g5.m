@@ -1,0 +1,14 @@
+PASSO 6
+POS 20 10
+D
+W
+D
+W
+D
+W
+A
+S
+A
+S
+A
+S

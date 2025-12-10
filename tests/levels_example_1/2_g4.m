@@ -1,0 +1,10 @@
+PASSO 10
+POS 22 90
+T 10
+A
+A
+T 10
+D
+D
+W
+S

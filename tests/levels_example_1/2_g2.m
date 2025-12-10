@@ -1,0 +1,9 @@
+PASSO 8
+POS 12 50
+C
+A
+T 5
+C
+D
+T 5
+R

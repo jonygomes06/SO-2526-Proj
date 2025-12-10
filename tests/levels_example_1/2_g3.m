@@ -1,0 +1,11 @@
+PASSO 4
+POS 5 80
+R
+R
+R
+R
+T 1
+R
+R
+W
+S

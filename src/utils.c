@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <time.h>
-#include <sys/wait.h>
 
 
 FILE * debugfile;
@@ -36,52 +35,6 @@ void sleep_ms(int milliseconds) {
     ts.tv_sec = milliseconds / 1000;
     ts.tv_nsec = (milliseconds % 1000) * 1000000;
     nanosleep(&ts, NULL);
-}
-
-int create_backup(board_t* board, pthread_t* pacman_tid, pacman_thread_arg_t* pacman_args) {
-    if (board->has_saved) {
-        debug("State has been already saved.\n");
-        return 0;
-    }
-
-    debug("Creating backup process.\n");
-
-    int pid = fork();
-    if (pid < 0) {
-        debug("Failed to create backup process.\n");
-        return -1;
-    }
-
-    board->has_saved = 1;
-    
-    if (pid != 0) {
-        // Parent process
-        debug("Parent process waiting.\n");
-        board->is_backup_instance = 0;
-        int status;
-        wait(&status); // Wait for child to finish and get its exit status
-        debug("Parent process resumed from backup with result %d.\n", board->level_result);
-        if (WIFEXITED(status)) {
-            board->level_result = WEXITSTATUS(status);
-        } else {
-            debug("Backup process did not terminate normally.\n");
-            board->level_result = QUIT_GAME_FORCED;
-        }
-        debug("Parent process restored from backup.\n");
-    } else {
-        // Child process - Backup instance
-        debug("Backup instance running.\n");
-        board->is_backup_instance = 1;
-        board->level_result = CONTINUE_PLAY;
-
-        // Recreate threads after fork TODO
-        if (pthread_create(pacman_tid, NULL, pacman_thread, (void*)pacman_args) != 0) {
-            debug("Error recreating pacman thread.\n");
-            return -1;
-        }
-    }
-
-    return 0;
 }
 
 void open_debug_file(char *filename) {

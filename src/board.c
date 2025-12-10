@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <sys/wait.h>
 
 
 static int find_and_kill_pacman(board_t* board, int new_x, int new_y);
@@ -75,8 +76,17 @@ void play_level(board_t* board) {
 
         if (board->play_result == CREATE_BACKUP) {
             debug("UI thread: Creating backup...\n");
-            create_backup(board, &pacman_tid, &pacman_args);
+            int result = create_backup(board, &pacman_tid, ghosts_tid, &pacman_args, ghost_args);
             board->play_result = CONTINUE;
+
+            if (result == -1) {
+                debug("UI thread: Backup creation failed, quitting game\n");
+                board->level_result = QUIT_GAME_FORCED;
+            } else if (result == 1) {
+                debug("UI thread: Backup instance created, skipping UI sem posts this time\n");
+                continue;
+            }
+
         } else if (board->play_result == REACHED_PORTAL) {
             debug("UI thread: Level completed, moving to next level\n");
             board->level_result = NEXT_LEVEL;
@@ -621,6 +631,72 @@ void unload_level(board_t * board) {
     free(board->board);
     free(board->pacmans);
     free(board->ghosts);
+}
+
+int create_backup(board_t* board, pthread_t* pacman_tid, pthread_t* ghosts_tid, pacman_thread_arg_t* pacman_args, ghost_thread_arg_t* ghost_args) {
+    if (board->has_saved) {
+        debug("State has been already saved.\n");
+        return 0;
+    }
+
+    debug("Creating backup process.\n");
+
+    int pid = fork();
+    if (pid < 0) {
+        debug("Failed to create backup process.\n");
+        return -1;
+    }
+
+    board->has_saved = 1;
+    
+    if (pid != 0) {
+        // Parent process
+        debug("Parent process waiting.\n");
+        board->is_backup_instance = 0;
+        int status;
+        wait(&status); // Wait for child to finish and get its exit status
+        debug("Parent process resumed from backup with result %d.\n", board->level_result);
+        if (WIFEXITED(status)) {
+            board->level_result = WEXITSTATUS(status);
+        } else {
+            debug("Backup process did not terminate normally.\n");
+            board->level_result = QUIT_GAME_FORCED;
+        }
+        debug("Parent process restored from backup.\n");
+    } else {
+        // Child process - Backup instance
+        debug("Backup instance running.\n");
+        board->is_backup_instance = 1;
+        board->level_result = CONTINUE_PLAY;
+
+        // The semaphores contain values copied from the parent. 
+        // We must reset them to 0 so the new threads start in a blocked state 
+        // waiting for the UI loop to release them.
+        sem_destroy(&sem_start_turn);
+        sem_destroy(&sem_finished_plays);
+        sem_destroy(&sem_render_complete);
+
+        sem_init(&sem_start_turn, 0, 0);
+        sem_init(&sem_finished_plays, 0, 0);
+        sem_init(&sem_render_complete, 0, 0);
+
+        // Recreate threads after fork TODO and Pass the same args as before
+        if (pthread_create(pacman_tid, NULL, pacman_thread, (void*)pacman_args) != 0) {
+            debug("Error recreating pacman thread.\n");
+            return -1;
+        }
+
+        for (int i = 0; i < board->n_ghosts; i++) {
+            if (pthread_create(&ghosts_tid[i], NULL, ghost_thread, (void*)&ghost_args[i]) != 0) {
+                debug("Error creating ghost thread for ghost %d.\n", i);
+                return -1;
+            }
+        }
+
+        return 1; // Indicate we are in backup instance, so it needs to skip sem post of ui because of sync issues with newly created threads
+    }
+
+    return 0;
 }
 
 
