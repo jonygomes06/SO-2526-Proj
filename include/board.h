@@ -10,9 +10,10 @@
 #define MAX_GHOSTS 25
 
 #define CONTINUE_PLAY 0
-#define NEXT_LEVEL 1        // Return this in backup instance to, indicates user reached last level for parent process
-#define QUIT_GAME 2         // Return this in backup instance to, indicates game should continue because pacman died
-#define QUIT_GAME_FORCED 3  // Return this in backup instance to, indicates game should quit because user pressed 'Q'
+#define NEXT_LEVEL 1        // Return this in backup instance too, indicates user reached last level for parent process
+#define QUIT_GAME 2         // Return this in backup instance too, indicates game should continue because pacman died
+#define QUIT_GAME_FORCED 3  // Return this in backup instance too, indicates game should quit because user pressed 'Q'
+#define BACKUP_WON_GAME 4   // Return this in backup instance too, indicates user reached last level
 
 typedef enum {
     CREATE_BACKUP = 2,

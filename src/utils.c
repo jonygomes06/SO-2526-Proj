@@ -74,7 +74,7 @@ int create_backup(board_t* board, pthread_t* pacman_tid, pacman_thread_arg_t* pa
         board->is_backup_instance = 1;
         board->level_result = CONTINUE_PLAY;
 
-        // Recreate threads after fork
+        // Recreate threads after fork TODO
         if (pthread_create(pacman_tid, NULL, pacman_thread, (void*)pacman_args) != 0) {
             debug("Error recreating pacman thread.\n");
             return -1;

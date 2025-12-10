@@ -1,4 +1,4 @@
-PASSO 1
+PASSO 10
 POS 5 4
 A
 W

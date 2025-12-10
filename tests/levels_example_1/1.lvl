@@ -2,7 +2,7 @@
 # só existe um no início por ficheiro
 DIM 6 6
 # TEMPO: indica a duração de cada jogada em milissegundos 60Hz = 17ms, 144hz 7ms
-TEMPO 50
+TEMPO 10
 # PAC: (opcional) indica o nome do ficheiro do pacman deste nível
 PAC 1.p
 # MON: indica os nomes dos ficheiros de monstros usados neste nível

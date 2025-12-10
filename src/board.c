@@ -10,16 +10,14 @@
 
 
 static int find_and_kill_pacman(board_t* board, int new_x, int new_y);
-
 static inline int get_board_index(board_t* board, int x, int y);
-
 static inline int is_valid_position(board_t* board, int x, int y);
-
 static inline void finish_play(board_t *board, int *level_state);
 
 
-sem_t sem_finished_plays;
-sem_t sem_ui_thread;
+sem_t sem_start_turn;      // Controls start of logic
+sem_t sem_finished_plays;  // Controls end of logic (waiting for UI)
+sem_t sem_render_complete; // Controls end of frame (releasing threads)
 
 
 void play_level(board_t* board) {
@@ -29,8 +27,9 @@ void play_level(board_t* board) {
     pthread_t pacman_tid;
     pthread_t ghosts_tid[board->n_ghosts];
 
+    sem_init(&sem_start_turn, 0, 0);
     sem_init(&sem_finished_plays, 0, 0);
-    sem_init(&sem_ui_thread, 0, 0);
+    sem_init(&sem_render_complete, 0, 0);
 
     pacman_thread_arg_t pacman_args;
     ghost_thread_arg_t ghost_args[board->n_ghosts];
@@ -52,17 +51,25 @@ void play_level(board_t* board) {
         }
     }
 
-    // int n_entities = board->n_pacmans + board->n_ghosts; // pacmans + ghosts
-    int n_entities = board->n_pacmans; // pacmans for now TODO remove this line when ghosts are implemented
+    int n_entities = board->n_pacmans + board->n_ghosts; // pacmans + ghosts
+    debug("UI thread: Starting level loop with %d entities.\n", n_entities);
 
     screen_refresh(board, DRAW_MENU);
 
     while (board->level_result == CONTINUE_PLAY) {
         sleep_ms(board->tempo);
 
+        // STEP 1: Release "Start the turn" semaphores to all entity threads
+        for (int i = 0; i < n_entities; i++) {
+            sem_post(&sem_start_turn);
+        }
+
+        // STEP 2: Wait for everyone to finish moving
         for (int i = 0; i < n_entities; i++) {
             sem_wait(&sem_finished_plays);
         }
+
+        debug("=== ALL ENTITIES MOVED - RENDERING ===\n");
 
         // Safe multithreaded enviorenment, other threads are waiting, no need to use locks
 
@@ -82,13 +89,22 @@ void play_level(board_t* board) {
         }
 
         board->pacmans[0].ui_key = get_input();
+        debug("UI thread: Got input %c\n", board->pacmans[0].ui_key);
 
         screen_refresh(board, DRAW_MENU);
 
+        debug("\n");
+
+        sleep_ms(board->tempo);
+
+
         // Unlock threads to play next turn, unsafe enviorenment
 
+        debug("=== RENDER COMPLETE - RELEASING - NEW PLAY ===\n");
+
+        // STEP 4: Release threads to complete the loop
         for (int i = 0; i < n_entities; i++) {
-            sem_post(&sem_ui_thread);
+            sem_post(&sem_render_complete);
         }
     }
     
@@ -96,40 +112,44 @@ void play_level(board_t* board) {
     for (int i = 0; i < board->n_ghosts; i++) {
         pthread_join(ghosts_tid[i], NULL);
     }
-    for (int i = 0; i < board->n_ghosts; i++) {
-        pthread_join(ghosts_tid[i], NULL);
-    }
 
     sem_destroy(&sem_finished_plays);
-    sem_destroy(&sem_ui_thread);
+    sem_destroy(&sem_start_turn);
+    sem_destroy(&sem_render_complete);
 
     return;
 }
 
 void* pacman_thread(void* arg) {
-    debug("Pacman thread started.\n");
     pacman_thread_arg_t* args = (pacman_thread_arg_t*)arg;
     board_t* board = args->board;
     pacman_t* pacman = &board->pacmans[args->pacman_id];
+
+    debug("Pacman %d thread started.\n", args->pacman_id);
 
     int level_state = board->level_result;
     command_t* play;
 
     while (level_state == CONTINUE_PLAY) {
+        sem_wait(&sem_start_turn);
+
+        debug("Pacman thread RUNNING: KEY %c\n", pacman->ui_key);
         if (pacman->waiting > 0) {
             pacman->waiting -= 1;
+            debug("STOPPING HERE 1\n");
             finish_play(board, &level_state);
             continue;
         }
         pacman->waiting = pacman->passo;
-
 
         if (pacman->n_moves == 0) { // if is user input
             command_t c; 
             c.command = pacman->ui_key;
 
             if(c.command == '\0') {
+                debug("STOPPING HERE 2\n");
                 finish_play(board, &level_state);
+                debug("CAME BACK HERE 2\n");
                 continue;
             } else if (c.command == 'G' || c.command == 'Q') { 
                 pthread_rwlock_wrlock(&board->play_res_rwlock);
@@ -139,6 +159,7 @@ void* pacman_thread(void* arg) {
                     board->play_result = QUIT_PRESSED;
                 }
                 pthread_rwlock_unlock(&board->play_res_rwlock);
+                debug("STOPPING HERE 3\n");
 
                 finish_play(board, &level_state);
                 continue;
@@ -154,7 +175,6 @@ void* pacman_thread(void* arg) {
         int new_x = pacman->pos_x;
         int new_y = pacman->pos_y;
 
-        debug("Pacman thread: KEY %c\n", play->command);
 
         char direction = play->command;
 
@@ -182,16 +202,20 @@ void* pacman_thread(void* arg) {
                     play->turns_left = play->turns;
                 }
                 else play->turns_left -= 1;
+                debug("STOPPING HERE 4\n");
                 finish_play(board, &level_state);
                 continue;
             default:
-                return CONTINUE; // Invalid direction
+                debug("STOPPING HERE INVALID MOVE\n");
+                finish_play(board, &level_state);
+                continue; // Invalid direction
         }
 
         // Logic for the auto movement
         pacman->current_move+=1;
 
         if (!is_valid_position(board, new_x, new_y)) {
+            debug("STOPPING HERE 5\n");
             finish_play(board, &level_state);
             continue;
         }
@@ -219,6 +243,7 @@ void* pacman_thread(void* arg) {
         if (!pacman->alive) {
             pthread_rwlock_unlock(&board->board[old_index].rwlock);
             pthread_rwlock_unlock(&board->board[new_index].rwlock);
+            debug("STOPPING HERE 6\n");
             finish_play(board, &level_state);
             continue;
         }
@@ -233,6 +258,7 @@ void* pacman_thread(void* arg) {
             pthread_rwlock_unlock(&board->play_res_rwlock);
             pthread_rwlock_unlock(&board->board[old_index].rwlock);
             pthread_rwlock_unlock(&board->board[new_index].rwlock);
+            debug("STOPPING HERE 7\n");
             finish_play(board, &level_state);
             continue;
         }
@@ -241,6 +267,7 @@ void* pacman_thread(void* arg) {
         if (target_content == 'W') {
             pthread_rwlock_unlock(&board->board[old_index].rwlock);
             pthread_rwlock_unlock(&board->board[new_index].rwlock);
+            debug("STOPPING HERE 8\n");
             finish_play(board, &level_state);
             continue;
         }
@@ -253,6 +280,7 @@ void* pacman_thread(void* arg) {
             pthread_rwlock_unlock(&board->play_res_rwlock);
             pthread_rwlock_unlock(&board->board[old_index].rwlock);
             pthread_rwlock_unlock(&board->board[new_index].rwlock);
+            debug("STOPPING HERE 9\n");
             finish_play(board, &level_state);
             continue;
         }
@@ -269,6 +297,7 @@ void* pacman_thread(void* arg) {
         board->board[new_index].content = 'P';
         pthread_rwlock_unlock(&board->board[old_index].rwlock);
         pthread_rwlock_unlock(&board->board[new_index].rwlock);
+        debug("STOPPING HERE 10\n");
         finish_play(board, &level_state);
     }
 
@@ -278,12 +307,138 @@ void* pacman_thread(void* arg) {
 void* ghost_thread(void* arg) {
     ghost_thread_arg_t* args = (ghost_thread_arg_t*)arg;
     board_t* board = args->board;
+    int ghost_id = args->ghost_id;
+    ghost_t* ghost = &board->ghosts[ghost_id];
 
-    int i = 0;
+    debug("Ghost %d thread started.\n", ghost_id);
 
-    while (i < 5) { // TODO remove this when ghosts are implemented
-        sleep_ms(board->tempo);
-        i++;
+    int level_state = board->level_result;
+    command_t* play;
+
+    while (level_state == CONTINUE_PLAY) {
+        sem_wait(&sem_start_turn);
+        debug("Ghost %d thread RUNNING\n", ghost_id);
+        if (ghost->waiting > 0) {
+            ghost->waiting -= 1;
+            debug("GHOST STOPPING HERE 1\n");
+            finish_play(board, &level_state);
+            continue;
+        }
+        ghost->waiting = ghost->passo;
+
+        play = &ghost->moves[ghost->current_move%ghost->n_moves];
+
+        int new_x = ghost->pos_x;
+        int new_y = ghost->pos_y;
+
+        char direction = play->command;
+
+         if (direction == 'R') {
+            char directions[] = {'W', 'S', 'A', 'D'};
+            direction = directions[rand() % 4];
+        }
+
+        debug("Ghost %d thread: KEY %c\n", ghost_id, play->command);
+
+        // Calculate new position based on direction
+        switch (direction) {
+            case 'W': // Up
+                new_y--;
+                break;
+            case 'S': // Down
+                new_y++;
+                break;
+            case 'A': // Left
+                new_x--;
+                break;
+            case 'D': // Right
+                new_x++;
+                break;
+            case 'C': // Charge
+                ghost->current_move += 1;
+                ghost->charged = 1;
+                debug("GHOST STOPPING HERE 2\n");
+                finish_play(board, &level_state);
+                continue;
+            case 'T': // Wait
+                if (play->turns_left == 1) {
+                    ghost->current_move += 1; // move on
+                    play->turns_left = play->turns;
+                }
+                else play->turns_left -= 1;
+                debug("GHOST STOPPING HERE 3\n");
+                finish_play(board, &level_state);
+                continue;
+            default:
+                debug("GHOST STOPPING HERE INVALID MOVE\n");
+                finish_play(board, &level_state);
+                continue; // Invalid direction
+        }
+
+        // Logic for the WASD movement
+        ghost->current_move++;
+        if (ghost->charged) {
+            //return move_ghost_charged(board, ghost, direction); // TODO
+            ghost->charged = 0; //uncharge for now
+            debug("GHOST STOPPING HERE 4\n");
+            finish_play(board, &level_state);
+            continue;
+        }
+
+        // Check boundaries
+        if (!is_valid_position(board, new_x, new_y)) {
+            debug("GHOST STOPPING HERE 5\n");
+            finish_play(board, &level_state);
+            continue;
+        }
+
+        int new_index = get_board_index(board, new_x, new_y);
+        int old_index = get_board_index(board, ghost->pos_x, ghost->pos_y);
+
+        int locks_acquired = 0;
+        int n_tries = 1;
+        int backoff_range = (int)(0.05 * board->tempo);
+        if (backoff_range < 1) backoff_range = 1;
+
+        while (!locks_acquired) {
+            pthread_rwlock_wrlock(&board->board[old_index].rwlock);
+            if (pthread_rwlock_trywrlock(&board->board[new_index].rwlock) == 0) {
+                locks_acquired = 1;
+            } else {
+                pthread_rwlock_unlock(&board->board[old_index].rwlock);
+                sleep_ms(rand() % (n_tries * backoff_range));
+                n_tries++;
+            }
+        }
+
+        char target_content = board->board[new_index].content;
+
+        // Check for walls and ghosts
+        if (target_content == 'W' || target_content == 'M') {
+            pthread_rwlock_unlock(&board->board[old_index].rwlock);
+            pthread_rwlock_unlock(&board->board[new_index].rwlock);
+            debug("GHOST STOPPING HERE 6\n");
+            finish_play(board, &level_state);
+            continue;
+        }
+
+        if (target_content == 'P') {
+            int result = find_and_kill_pacman(board, new_x, new_y);
+            pthread_rwlock_wrlock(&board->play_res_rwlock);
+            board->play_result = result;
+            pthread_rwlock_unlock(&board->play_res_rwlock);
+        }
+        // Update board - clear old position (restore what was there)
+        board->board[old_index].content = ' '; // Or restore the dot if ghost was on one
+        // Update ghost position
+        ghost->pos_x = new_x;
+        ghost->pos_y = new_y;
+        // Update board - set new position
+        board->board[new_index].content = 'M';
+        pthread_rwlock_unlock(&board->board[old_index].rwlock);
+        pthread_rwlock_unlock(&board->board[new_index].rwlock);
+        debug("GHOST STOPPING HERE 7\n");
+        finish_play(board, &level_state);
     }
 
     return NULL;
@@ -367,8 +522,7 @@ static int move_ghost_charged_direction(board_t* board, ghost_t* ghost, char dir
     return CONTINUE;
 }   
 
-int move_ghost_charged(board_t* board, int ghost_index, char direction) {
-    ghost_t* ghost = &board->ghosts[ghost_index];
+int move_ghost_charged(board_t* board, ghost_t* ghost, char direction) {
     int x = ghost->pos_x;
     int y = ghost->pos_y;
     int new_x = x;
@@ -390,92 +544,6 @@ int move_ghost_charged(board_t* board, int ghost_index, char direction) {
     // Update ghost position
     ghost->pos_x = new_x;
     ghost->pos_y = new_y;
-    // Update board - set new position
-    board->board[new_index].content = 'M';
-    return result;
-}
-
-int move_ghost(board_t* board, int ghost_index, command_t* command) {
-    ghost_t* ghost = &board->ghosts[ghost_index];
-    int new_x = ghost->pos_x;
-    int new_y = ghost->pos_y;
-
-    // check passo
-    if (ghost->waiting > 0) {
-        ghost->waiting -= 1;
-        return CONTINUE;
-    }
-    ghost->waiting = ghost->passo;
-
-    char direction = command->command;
-    
-    if (direction == 'R') {
-        char directions[] = {'W', 'S', 'A', 'D'};
-        direction = directions[rand() % 4];
-    }
-
-    // Calculate new position based on direction
-    switch (direction) {
-        case 'W': // Up
-            new_y--;
-            break;
-        case 'S': // Down
-            new_y++;
-            break;
-        case 'A': // Left
-            new_x--;
-            break;
-        case 'D': // Right
-            new_x++;
-            break;
-        case 'C': // Charge
-            ghost->current_move += 1;
-            ghost->charged = 1;
-            return CONTINUE;
-        case 'T': // Wait
-            if (command->turns_left == 1) {
-                ghost->current_move += 1; // move on
-                command->turns_left = command->turns;
-            }
-            else command->turns_left -= 1;
-            return CONTINUE;
-        default:
-            return CONTINUE; // Invalid direction
-    }
-
-    // Logic for the WASD movement
-    ghost->current_move++;
-    if (ghost->charged)
-        return move_ghost_charged(board, ghost_index, direction);
-
-    // Check boundaries
-    if (!is_valid_position(board, new_x, new_y)) {
-        return CONTINUE;
-    }
-
-    // Check board position
-    int new_index = get_board_index(board, new_x, new_y);
-    int old_index = get_board_index(board, ghost->pos_x, ghost->pos_y);
-    char target_content = board->board[new_index].content;
-
-    // Check for walls and ghosts
-    if (target_content == 'W' || target_content == 'M') {
-        return CONTINUE;
-    }
-
-    int result = CONTINUE;
-    // Check for pacman
-    if (target_content == 'P') {
-        result = find_and_kill_pacman(board, new_x, new_y);
-    }
-
-    // Update board - clear old position (restore what was there)
-    board->board[old_index].content = ' '; // Or restore the dot if ghost was on one
-
-    // Update ghost position
-    ghost->pos_x = new_x;
-    ghost->pos_y = new_y;
-
     // Update board - set new position
     board->board[new_index].content = 'M';
     return result;
@@ -579,9 +647,14 @@ static inline int is_valid_position(board_t* board, int x, int y) {
     return (x >= 0 && x < board->width) && (y >= 0 && y < board->height); // Inside of the board boundaries
 }
 
-// Helper private function to finish play and synchronize with UI thread level state
 static inline void finish_play(board_t *board, int *level_state) {
+    // 1. Tell UI we are done with our move
     sem_post(&sem_finished_plays);
-    sem_wait(&sem_ui_thread);
+
+    // 2. Wait for UI to finish rendering and game state checks
+    // This acts as a barrier so we don't loop around too fast
+    sem_wait(&sem_render_complete);
+
+    // 3. Update local state (safe now because UI has finished writing to it)
     *level_state = board->level_result;
 }

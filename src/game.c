@@ -50,6 +50,9 @@ int main(int argc, char** argv) {
         } else if (game_board.level_result == QUIT_GAME_FORCED) {
             debug("Main thread: User forced quit, exiting game.\n");
             end_game = true;
+        } else if (game_board.level_result == BACKUP_WON_GAME) {
+            debug("Main thread: Backup instance won the game, exiting.\n");
+            end_game = true;
         }
         
         accumulated_points = game_board.pacmans[0].points;
@@ -59,12 +62,12 @@ int main(int argc, char** argv) {
     }
 
     if (game_board.is_backup_instance) {
-        debug("Backup instance exiting with result %d.\n", game_board.level_result);
         if (game_board.level_result == QUIT_GAME) {
             game_board.level_result = CONTINUE_PLAY;
-        } else if (game_board.level_result == CONTINUE_PLAY) {
-            game_board.level_result = NEXT_LEVEL;
+        } else if (game_board.level_result == NEXT_LEVEL && game_board.current_level > game_board.n_levels) {
+            game_board.level_result = BACKUP_WON_GAME;
         }
+        debug("Backup instance exiting with result %d.\n", game_board.level_result);
         exit(game_board.level_result);
     }
 
