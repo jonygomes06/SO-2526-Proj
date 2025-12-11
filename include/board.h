@@ -16,6 +16,8 @@
 #define BACKUP_WON_GAME 4   // Return this in backup instance too, indicates user reached last level
 
 typedef enum {
+    VALID_MOVE = 4,
+    INVALID_MOVE = 3,
     CREATE_BACKUP = 2,
     REACHED_PORTAL = 1,
     CONTINUE = 0,
@@ -98,12 +100,6 @@ void* pacman_thread(void* arg);
 
 /*Ghost(Monster) Thread*/
 void* ghost_thread(void* arg);
-
-
-/*Processes a command for Pacman or Ghost(Monster)
-*_index - corresponding index in board's pacman_t/ghost_t array
-command - command to be processed*/
-int move_ghost(board_t* board, int ghost_index, command_t* command);
 
 /*Process the death of a Pacman*/
 void kill_pacman(board_t* board, int pacman_index);
